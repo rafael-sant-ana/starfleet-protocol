@@ -5,11 +5,19 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <unistd.h>
+#include <protocol.h>
+
+#define MAX_INPUT_LINE 16 
+
+#define MIN_ACTION 0
+#define MAX_ACTION 4
 
 #define MAX_DATA_SIZE 256
 
+int get_client_input();
+
 int main(int argc, char *argv[]) {
-    int sockfd, numbytes;
+    int sockfd;
     struct addrinfo hints, *servinfo, *p;
     int rv;
     char s[INET6_ADDRSTRLEN];
@@ -52,22 +60,110 @@ int main(int argc, char *argv[]) {
         return 2;
     }
 
-    printf("Conectado ao servidor.\n");
-    
-    if ((numbytes = recv(sockfd, buf, MAX_DATA_SIZE - 1, 0)) == -1) {
-        perror("recv");
-        exit(1);
-    }
-    
-    if (numbytes > 0) {
-        buf[numbytes] = '\0';
-        printf("Mensagem do Servidor: %s\n", buf);
-    } else {
-        printf("Servidor fechou a conexão.\n");
+    printf("conectado.\n");
+
+    BattleMessage received_msg;
+    BattleMessage client_response;
+    ssize_t numbytes;
+    int game_running = 1;
+    int turn_number=1;
+
+    while (game_running) {
+        ssize_t numbytes = recv(sockfd, &received_msg, sizeof(BattleMessage), 0);
+        if (numbytes == sizeof(BattleMessage)) {
+            switch (received_msg.type) {
+                
+                case MSG_ACTION_REQ:
+                    printf("\n--- TURNO %d ---\n", turn_number);
+                    printf("Escolha sua acao:\n");
+                    printf(" 0 Laser Attack\n");
+                    printf(" 1 Photon Torpedo\n");
+                    printf(" 2 Shields Up\n");
+                    printf(" 3 Cloaking\n");
+                    printf(" 4 Hyper Jump\n");
+                    
+                    int chosen_action = get_client_input(); 
+                    
+                    memset(&client_response, 0, sizeof(BattleMessage));
+                    client_response.type = MSG_ACTION_RES;
+                    client_response.client_action = chosen_action;
+                    
+                    if (send(sockfd, &client_response, sizeof(BattleMessage), 0) == -1) {
+                        perror("send action error");
+                        game_running = 0;
+                    }
+                    break;
+                    
+                case MSG_BATTLE_RESULT:
+                    printf("\n%s\n", received_msg.message);
+                    printf("Placar: Voce %d x %d Inimigo\n", received_msg.client_hp, received_msg.server_hp);
+                    break;
+                    
+                case MSG_GAME_OVER:
+                case MSG_ESCAPE:
+                    printf("\n--- FIM DE JOGO ---\n");
+                    printf("%s\n", received_msg.message);
+                    
+                    printf("Inventario final:\n");
+                    printf("HP restante: %d\n", received_msg.client_hp);
+                    printf("Torpedos usados: %d\n", received_msg.client_torpedoes);
+                    printf("Escudos usados: %d\n", received_msg.client_shields);
+                    
+                    game_running = 0;
+                    break;
+
+                case MSG_INIT:
+                    printf("Escolha sua acao:\n"); 
+                    printf(" 0 Laser Attack\n 1 Photon Torpedo\n 2 Shields Up\n 3 Cloaking\n 4 Hyper Jump\n");
+                    break;
+                    
+                default:
+                    fprintf(stderr, "Erro: Mensagem de tipo desconhecido (%d) recebida.\n", received_msg.type);
+                    game_running = 0;
+                    break;
+            }
+        } 
+        else if (numbytes == 0) {
+            printf("\nServidor fechou a conexão.\n");
+            game_running = 0;
+        } else if (numbytes == -1) {
+            perror("recv error");
+            game_running = 0;
+        } else {
+             fprintf(stderr, "Erro: Leitura parcial de mensagem.\n");
+             game_running = 0;
+        }
     }
 
     freeaddrinfo(servinfo);
     close(sockfd);
 
     return 0;
+}
+
+int get_client_input() {
+    char input_line[MAX_INPUT_LINE];
+    int action = -1;
+    char extra_char;
+    
+    while (1) {
+        printf("> ");
+        fflush(stdout);
+
+        if (fgets(input_line, MAX_INPUT_LINE, stdin) == NULL) {
+            fprintf(stderr, "nao deu pra ler entradas.\n");
+            exit(EXIT_FAILURE); 
+        }
+
+        int scan_count = sscanf(input_line, "%d%c", &action, &extra_char);
+
+        if (action >= MIN_ACTION && action <= MAX_ACTION) {
+            return action;
+        } else {
+            fprintf(stderr, "\nErro: escolha inválida!\n"); 
+            fprintf(stderr, "Por favor selecione um valor entre %d e %d.\n", MIN_ACTION, MAX_ACTION); 
+            printf("Escolha sua acao:\n"); 
+            printf(" 0 Laser Attack\n 1 Photon Torpedo\n 2 Shields Up\n 3 Cloaking\n 4 Hyper Jump\n");
+        }
+    }
 }
