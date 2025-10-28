@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
     BattleMessage client_response;
     ssize_t numbytes;
     int game_running = 1;
-    int turn_number=1;
+    int turn_number=0;
 
     while (game_running) {
         ssize_t numbytes = recv(sockfd, &received_msg, sizeof(BattleMessage), 0);
@@ -87,6 +87,7 @@ int main(int argc, char *argv[]) {
                     printf(" 4 Hyper Jump\n");
                     
                     int chosen_action = get_client_input(); 
+                    turn_number++;
                     
                     memset(&client_response, 0, sizeof(BattleMessage));
                     client_response.type = MSG_ACTION_RES;
@@ -107,9 +108,11 @@ int main(int argc, char *argv[]) {
                     printf("%s\n", received_msg.message);
                     
                     printf("Inventario final:\n");
-                    printf("HP restante: %d\n", received_msg.client_hp);
+                    printf("HP restante da sua nave: %d\n", received_msg.client_hp);
+                    printf("HP restante da nave inimiga: %d\n", received_msg.server_hp);
                     printf("Torpedos usados: %d\n", received_msg.client_torpedoes);
                     printf("Escudos usados: %d\n", received_msg.client_shields);
+                    printf("Turnos jogados: %d\n", turn_number);
                     printf("Obrigado por jogar!\n");
                     
                     game_running = 0;
@@ -120,7 +123,6 @@ int main(int argc, char *argv[]) {
                     game_running = 0;
                     break;
             }
-            turn_number++;
         } 
         else if (numbytes == 0) {
             printf("\nServidor fechou a conexão.\n");
