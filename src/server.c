@@ -338,11 +338,18 @@ int send_message(int fd, const BattleMessage *msg) {
         append_message(result_msg, "Voce derrotou a frota inimiga!\n");
     }
 
+
+
     result_msg->client_hp = state->client_hp;
     result_msg->server_hp = state->server_hp;
     result_msg->client_torpedoes = state->client_torpedoes;
     result_msg->client_shields = state->client_shields;
     result_msg->type = MSG_BATTLE_RESULT;
+
+    if (state->client_hp <= 0 || state->server_hp <= 0) {
+        append_message(result_msg, "Obrigado por jogar!.\n");
+        result_msg->type = MSG_GAME_OVER;
+    }
 }
 
 

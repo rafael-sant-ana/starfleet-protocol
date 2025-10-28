@@ -110,7 +110,6 @@ int main(int argc, char *argv[]) {
                     printf("HP restante: %d\n", received_msg.client_hp);
                     printf("Torpedos usados: %d\n", received_msg.client_torpedoes);
                     printf("Escudos usados: %d\n", received_msg.client_shields);
-                    printf("Turnos jogados: %d\n", turn_number);
                     printf("Obrigado por jogar!\n");
                     
                     game_running = 0;
@@ -121,6 +120,7 @@ int main(int argc, char *argv[]) {
                     game_running = 0;
                     break;
             }
+            turn_number++;
         } 
         else if (numbytes == 0) {
             printf("\nServidor fechou a conexão.\n");
