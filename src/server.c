@@ -102,7 +102,6 @@ int main(int argc, char *argv[]) {
     printf("servidor StarFleet-Protocol inicializado em (%s:%s). aguardando conexao...\n", protocol_arg, port_arg);
 
     while (1) { 
-        printf("aguardando conexao...\n");
         sin_size = sizeof their_addr;
         new_fd = accept(server_fd, (struct sockaddr *)&their_addr, &sin_size);
         if (new_fd == -1) {
@@ -151,16 +150,14 @@ int main(int argc, char *argv[]) {
                 break;
             }
             
-            printf("turno %d: aguardando açao de quem ta conectado...\n", state.turns);
             // aqui a gnt ta recebendo
             bytes_received = recv(new_fd, &client_action_msg, sizeof(BattleMessage), 0);
 
             if (bytes_received == sizeof(BattleMessage) && client_action_msg.type == MSG_ACTION_RES) {
                 int action = client_action_msg.client_action;
-                printf("acao do jogador: %d\n", action);
 
                 if (action < 0 || action > 4) {
-                    fprintf(stderr, "aviso: cliente enviou uma açao que nao e valida (%d).\n", action);
+                    // fprintf(stderr, "aviso: cliente enviou uma açao que nao e valida (%d).\n", action);
                 } else if (action == 4) { 
                     // termina o jogo prematuramente
                     game_over = 1;
@@ -169,7 +166,7 @@ int main(int argc, char *argv[]) {
                     res_msg.client_hp = state.client_hp;
                     res_msg.client_torpedoes = state.client_torpedoes;
                     res_msg.client_shields = state.client_shields;
-                    snprintf(res_msg.message, MSG_SIZE, "voce acionou o Hyper Jump e escapou para o hiperespaço.");
+                    snprintf(res_msg.message, MSG_SIZE, "Sua nave escapou para o hiperespaco.");
                     send_message(new_fd, &res_msg);
                     break;
                 }
@@ -226,31 +223,53 @@ int send_message(int fd, const BattleMessage *msg) {
 
     if (client_action == ACTION_TORPEDO) { 
         state->client_torpedoes++;
-        append_message(result_msg, "Cliente carregou um Torpedo. ");
+        snprintf(formatted_string, sizeof(formatted_string), "Voce disparou um Photon Torpedo! \n");
+        append_message(result_msg, formatted_string);
     } else if (client_action == ACTION_SHIELDS) { 
+        snprintf(formatted_string, sizeof(formatted_string), "Voce ativou os Escudos! \n");
+        append_message(result_msg, formatted_string);
         state->client_shields++;
+    } else if (client_action == ACTION_CLOAKING) { 
+        snprintf(formatted_string, sizeof(formatted_string), "Voce ativou Cloaking! \n");
+        append_message(result_msg, formatted_string);
+    } else if (client_action == ACTION_LASER) { 
+        snprintf(formatted_string, sizeof(formatted_string), "Voce disparou um Laser! \n");
+        append_message(result_msg, formatted_string);
     }
 
-    // --- Client ataca e servidor defende ---
+    if (server_action == ACTION_TORPEDO) { 
+        state->client_torpedoes++;
+        snprintf(formatted_string, sizeof(formatted_string), "Servidor disparou um Photon Torpedo! \n");
+        append_message(result_msg, formatted_string);
+    } else if (server_action == ACTION_SHIELDS) { 
+        snprintf(formatted_string, sizeof(formatted_string), "Servidor ativou os Escudos! \n");
+        append_message(result_msg, formatted_string);
+        state->client_shields++;
+    } else if (server_action == ACTION_CLOAKING) { 
+        snprintf(formatted_string, sizeof(formatted_string), "Servidor ativou Cloaking! \n");
+        append_message(result_msg, formatted_string);
+    } else if (server_action == ACTION_LASER) { 
+        snprintf(formatted_string, sizeof(formatted_string), "Servidor disparou um Laser! \n");
+        append_message(result_msg, formatted_string);
+    }
 
+    
     int client_attacked = (client_action == ACTION_LASER || client_action == ACTION_TORPEDO);
     if (client_attacked) {
         int server_blocked = 0;
         
         if (server_action == ACTION_SHIELDS) {
-            snprintf(formatted_string, sizeof(formatted_string), "Ataque do cliente bloqueado pelos Escudos do inimigo! ");
+            snprintf(formatted_string, sizeof(formatted_string), "Resultado: Seu ataque foi bloqueado!.\n");
             append_message(result_msg, formatted_string);
             server_blocked = 1;
         } else if (server_action == ACTION_CLOAKING && client_action == ACTION_TORPEDO) {
-            snprintf(formatted_string, sizeof(formatted_string), "Torpedo do cliente evitado pela Camuflagem do inimigo! ");
+            snprintf(formatted_string, sizeof(formatted_string), "Resultado: Seu ataque falhou!.\n");
             append_message(result_msg, formatted_string);
             server_blocked = 1;
         }
 
         if (!server_blocked) {
             server_damage += BASE_DAMAGE;
-            snprintf(formatted_string, sizeof(formatted_string), "Cliente disparou %s! Acerto no inimigo. ", (client_action == ACTION_LASER ? "Laser" : "Torpedo"));
-            append_message(result_msg, formatted_string);
         }
     }
 
@@ -260,19 +279,17 @@ int send_message(int fd, const BattleMessage *msg) {
         int client_blocked = 0;
 
         if (client_action == ACTION_SHIELDS) {
-            snprintf(formatted_string, sizeof(formatted_string), "Ataque do inimigo bloqueado pelos Escudos do cliente! ");
+            snprintf(formatted_string, sizeof(formatted_string), "Resultado: Ataque inimigo bloqueado!.\n");
             append_message(result_msg, formatted_string);
             client_blocked = 1;
         } else if (client_action == ACTION_CLOAKING && server_action == ACTION_TORPEDO) {
-            snprintf(formatted_string, sizeof(formatted_string), "Torpedo do inimigo evitado pela Camuflagem do cliente! ");
+            snprintf(formatted_string, sizeof(formatted_string), "Resultado: Ataque inimigo falhou!.\n");
             append_message(result_msg, formatted_string);
             client_blocked = 1;
         }
 
         if (!client_blocked) {
             client_damage += BASE_DAMAGE;
-            snprintf(formatted_string, sizeof(formatted_string), "Inimigo disparou %s! Acerto no cliente. ", (server_action == ACTION_LASER ? "Laser" : "Torpedo"));
-            append_message(result_msg, formatted_string);
         }
     }
 
@@ -281,25 +298,27 @@ int send_message(int fd, const BattleMessage *msg) {
         // lciente ganha
         server_damage = BASE_DAMAGE;
         client_damage = 0;          
-        char* msg = "CLIENTE Torpedo VENCE Laser! Inimigo sofre 20 HP. ";
+        char* msg = "Resultado: Acerto! Nave inimiga perdeu 20 HP.\n";
         strncpy(result_msg->message, msg ,strlen(msg)+1); 
     } else if (client_action == ACTION_LASER && server_action == ACTION_TORPEDO) {
         // server ganha
         client_damage = BASE_DAMAGE;
         server_damage = 0;          
-        char* msg = "INIMIGO Torpedo VENCE Laser! Cliente sofre 20 HP. ";
+        char* msg = "Resultado: Voce recebeu 20 de dano .\n";
         strncpy(result_msg->message, msg, strlen(msg)+1); 
     } else if (client_action == server_action) {
         if (client_attacked) { 
             client_damage = BASE_DAMAGE;
             server_damage = BASE_DAMAGE;
 
-            snprintf(formatted_string, sizeof(formatted_string), "ambos sofrem %d HP de dano. ", BASE_DAMAGE);
-            append_message(result_msg, formatted_string);
-        } else if (client_action == ACTION_SHIELDS || client_action == ACTION_CLOAKING) {
-            snprintf(formatted_string, sizeof(formatted_string), "manobras defensivas mutuas. Sem dano. ");
+            snprintf(formatted_string, sizeof(formatted_string), "Resultado: Ambos receberam %d de dano.\n", BASE_DAMAGE);
             append_message(result_msg, formatted_string);
         }
+    }
+
+    if ((client_action == ACTION_SHIELDS && server_action == ACTION_SHIELDS) || (client_action == ACTION_CLOAKING && server_action == ACTION_CLOAKING) || (client_action == ACTION_SHIELDS && server_action == ACTION_CLOAKING) || (client_action == ACTION_CLOAKING && server_action == ACTION_SHIELDS)) {
+        snprintf(formatted_string, sizeof(formatted_string), "Resultado: Manobras defensivas mutuas. Sem dano.\n");
+        append_message(result_msg, formatted_string);
     }
 
     state->client_hp -= client_damage;
@@ -308,14 +327,17 @@ int send_message(int fd, const BattleMessage *msg) {
     if (state->client_hp < 0) state->client_hp = 0;
     if (state->server_hp < 0) state->server_hp = 0;
 
-    if (strnlen(result_msg->message, MSG_SIZE) == 0) {
-        snprintf(formatted_string, sizeof(formatted_string), "nenhuma interaçao de dano neste turno.");
-        append_message(result_msg, formatted_string);
+    snprintf(formatted_string, sizeof(formatted_string), "Placar: Voce %d x %d Inimigo\n", state->client_hp, state->server_hp);
+    append_message(result_msg, formatted_string);
+    
+    if (state->client_hp <= 0 && state->server_hp <= 0) {
+        append_message(result_msg, "Empate! Ambas as naves foram destruídas.\n");
+    } else if (state->client_hp <= 0) {
+        append_message(result_msg, "Sua nave foi destruida.”.\n");
+    } else if (state->server_hp <= 0) {
+        append_message(result_msg, "Voce derrotou a frota inimiga!\n");
     }
 
-    snprintf(formatted_string, sizeof(formatted_string), " | Placar: Voce %d x %d Inimigo", state->client_hp, state->server_hp);
-        append_message(result_msg, formatted_string);
-    
     result_msg->client_hp = state->client_hp;
     result_msg->server_hp = state->server_hp;
     result_msg->client_torpedoes = state->client_torpedoes;

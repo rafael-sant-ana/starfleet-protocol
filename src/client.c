@@ -72,9 +72,13 @@ int main(int argc, char *argv[]) {
         ssize_t numbytes = recv(sockfd, &received_msg, sizeof(BattleMessage), 0);
         if (numbytes == sizeof(BattleMessage)) {
             switch (received_msg.type) {
+                case MSG_INIT:
+                    printf("Conectado ao servidor.\n"); 
+                    printf("Sua nave: SS-42 Voyager (HP: %d)\n", received_msg.client_hp); 
+                    
+                    break;
                 
                 case MSG_ACTION_REQ:
-                    printf("\n--- TURNO %d ---\n", turn_number);
                     printf("Escolha sua acao:\n");
                     printf(" 0 Laser Attack\n");
                     printf(" 1 Photon Torpedo\n");
@@ -96,27 +100,22 @@ int main(int argc, char *argv[]) {
                     
                 case MSG_BATTLE_RESULT:
                     printf("\n%s\n", received_msg.message);
-                    printf("Placar: Voce %d x %d Inimigo\n", received_msg.client_hp, received_msg.server_hp);
                     break;
                     
                 case MSG_GAME_OVER:
                 case MSG_ESCAPE:
-                    printf("\n--- FIM DE JOGO ---\n");
                     printf("%s\n", received_msg.message);
                     
                     printf("Inventario final:\n");
                     printf("HP restante: %d\n", received_msg.client_hp);
                     printf("Torpedos usados: %d\n", received_msg.client_torpedoes);
                     printf("Escudos usados: %d\n", received_msg.client_shields);
+                    printf("Turnos jogados: %d\n", turn_number);
+                    printf("Obrigado por jogar!\n");
                     
                     game_running = 0;
                     break;
 
-                case MSG_INIT:
-                    printf("Escolha sua acao:\n"); 
-                    printf(" 0 Laser Attack\n 1 Photon Torpedo\n 2 Shields Up\n 3 Cloaking\n 4 Hyper Jump\n");
-                    break;
-                    
                 default:
                     fprintf(stderr, "Erro: Mensagem de tipo desconhecido (%d) recebida.\n", received_msg.type);
                     game_running = 0;
