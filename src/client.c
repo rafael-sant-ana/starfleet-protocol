@@ -20,8 +20,6 @@ int main(int argc, char *argv[]) {
     int sockfd;
     struct addrinfo hints, *servinfo, *p;
     int rv;
-    char s[INET6_ADDRSTRLEN];
-    char buf[MAX_DATA_SIZE];
     
     if (argc != 3) {
         fprintf(stderr, "Uso: %s <hostname/IP> <porta>\n", argv[0]);
@@ -64,7 +62,6 @@ int main(int argc, char *argv[]) {
 
     BattleMessage received_msg;
     BattleMessage client_response;
-    ssize_t numbytes;
     int game_running = 1;
     int turn_number=0;
 
@@ -156,7 +153,7 @@ int get_client_input() {
             exit(EXIT_FAILURE); 
         }
 
-        int scan_count = sscanf(input_line, "%d%c", &action, &extra_char);
+        sscanf(input_line, "%d%c", &action, &extra_char);
 
         if (action >= MIN_ACTION && action <= MAX_ACTION) {
             return action;
