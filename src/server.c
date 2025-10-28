@@ -330,7 +330,6 @@ void append_message(BattleMessage *result_msg, const char *string_to_append) {
     }
 
     size_t current_len = strnlen(result_msg->message, MSG_SIZE);
-    size_t string_len = strnlen(string_to_append, MSG_SIZE);
     size_t remaining_size = MSG_SIZE - current_len;
 
     if (remaining_size <= 1) {
